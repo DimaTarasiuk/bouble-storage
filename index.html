@@ -2,6 +2,7 @@
 <html lang="uk">
 <head>
     <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>R2 Photo Storage</title>
     <style>
         @import url('https://fonts.googleapis.com/css2?family=Nunito:wght@400;600;700;800&display=swap');
@@ -300,6 +301,100 @@
             from { opacity: 0; }
             to { opacity: 1; }
         }
+
+        /* ── Mobile adaptation ── */
+        @media (max-width: 600px) {
+            body {
+                padding: 16px 10px;
+            }
+
+            .card {
+                padding: 20px 16px;
+                border-radius: 22px;
+            }
+
+            h1 {
+                font-size: 16px;
+            }
+
+            h2 {
+                font-size: 14px;
+                margin: 22px 0 12px;
+            }
+
+            #uploadForm {
+                flex-wrap: wrap;
+            }
+
+            .file-wrap {
+                width: 100%;
+            }
+
+            input[type="file"] {
+                font-size: 12px;
+            }
+
+            input[type="file"]::file-selector-button {
+                padding: 7px 10px;
+                font-size: 11px;
+            }
+
+            button[type="submit"] {
+                margin-left: auto;
+            }
+
+            #gallery {
+                grid-template-columns: repeat(3, 1fr);
+                gap: 10px;
+            }
+
+            .item img {
+                height: 80px;
+            }
+
+            .item .name {
+                font-size: 9px;
+            }
+
+            .item .size {
+                font-size: 9px;
+            }
+
+            #pagination {
+                gap: 10px;
+            }
+
+            .page-btn {
+                padding: 8px 14px;
+                font-size: 11px;
+            }
+
+            #lightbox {
+                padding: 14px;
+            }
+
+            #lightbox .box {
+                padding: 12px;
+                border-radius: 18px;
+            }
+
+            #lightbox img {
+                max-height: 65vh;
+            }
+
+            #lightbox .caption span {
+                font-size: 11px;
+                overflow: hidden;
+                text-overflow: ellipsis;
+                white-space: nowrap;
+            }
+        }
+
+        @media (max-width: 380px) {
+            #gallery {
+                grid-template-columns: repeat(2, 1fr);
+            }
+        }
     </style>
 </head>
 <body>
@@ -374,11 +469,11 @@
             const text = await res.text();
 
             if (res.ok) {
-                statusEl.textContent = '✅ ' + text;
+                statusEl.textContent = '' + text;
                 form.reset();
                 loadPage(1);
             } else {
-                statusEl.textContent = '❌ ' + text;
+                statusEl.textContent = '' + text;
             }
         });
 
@@ -390,7 +485,7 @@
             gallery.innerHTML = '';
 
             if (data.items.length === 0) {
-                gallery.innerHTML = '<div class="empty">Тут поки порожньо 📭</div>';
+                gallery.innerHTML = '<div class="empty">Тут поки порожньо</div>';
             } else {
                 data.items.forEach(item => {
                     const div = document.createElement('div');
