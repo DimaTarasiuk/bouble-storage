@@ -124,26 +124,35 @@ func handleUpload(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "Тільки POST", http.StatusMethodNotAllowed)
 		return
 	}
-
+ 
+	// Обмеження загального розміру запиту (всі файли разом, до 50MB)
+	r.Body = http.MaxBytesReader(w, r.Body, 50<<20)
+ 
+	err := r.ParseMultipartForm(50 << 20)
+	if err != nil {
+		http.Error(w, fmt.Sprintf("Помилка парсингу форми: %v", err), http.StatusBadRequest)
+		return
+	}
+ 
 	headers := r.MultipartForm.File["photo"]
 	if len(headers) == 0 {
 		http.Error(w, "Не передано жодного файлу", http.StatusBadRequest)
 		return
 	}
-
-	//check backet limit
+ 
+	// --- Перевірка ліміту бакета ПЕРЕД завантаженням, рахуючи ВСІ файли разом ---
 	var totalNewBytes int64
 	for _, h := range headers {
 		totalNewBytes += h.Size
 	}
-
+ 
 	currentSize, err := getBucketTotalSize(r.Context())
 	if err != nil {
 		log.Printf("Помилка підрахунку розміру бакета: %v", err)
 		http.Error(w, fmt.Sprintf("Помилка перевірки розміру бакета: %v", err), http.StatusInternalServerError)
 		return
 	}
-
+ 
 	if currentSize+totalNewBytes > maxBucketBytes {
 		msg := fmt.Sprintf(
 			"Відмова: бакет заповнений (%.2f GB з %.2f GB лімітом), %d файл(и) (%.2f MB разом) не влізуть",
@@ -152,15 +161,15 @@ func handleUpload(w http.ResponseWriter, r *http.Request) {
 			len(headers),
 			float64(totalNewBytes)/(1024*1024),
 		)
-		log.Println("" + msg)
+		log.Println("Shit " + msg)
 		http.Error(w, msg, http.StatusInsufficientStorage) // 507
 		return
 	}
-
+ 
 	// --- Завантажуємо кожен файл по черзі ---
 	var uploaded []string
 	var failed []string
-
+ 
 	for _, header := range headers {
 		file, err := header.Open()
 		if err != nil {
@@ -168,9 +177,9 @@ func handleUpload(w http.ResponseWriter, r *http.Request) {
 			failed = append(failed, header.Filename)
 			continue
 		}
-
+ 
 		fmt.Printf("Отримано файл: %s, розмір: %d байт\n", header.Filename, header.Size)
-
+ 
 		_, err = s3Client.PutObject(context.TODO(), &s3.PutObjectInput{
 			Bucket:      aws.String(bucketName),
 			Key:         aws.String(header.Filename),
@@ -178,22 +187,22 @@ func handleUpload(w http.ResponseWriter, r *http.Request) {
 			ContentType: aws.String(header.Header.Get("Content-Type")),
 		})
 		file.Close()
-
+ 
 		if err != nil {
 			log.Printf("Помилка завантаження %s в R2: %v", header.Filename, err)
 			failed = append(failed, header.Filename)
 			continue
 		}
-
+ 
 		uploaded = append(uploaded, header.Filename)
 	}
-
+ 
 	if len(failed) > 0 {
 		w.WriteHeader(http.StatusMultiStatus) // 207 some photos are loaded
 		fmt.Fprintf(w, "Завантажено: %d (%v). Помилка з: %v", len(uploaded), uploaded, failed)
 		return
 	}
-
+ 
 	fmt.Fprintf(w, "Успішно завантажено %d файл(и): %v", len(uploaded), uploaded)
 }
 
