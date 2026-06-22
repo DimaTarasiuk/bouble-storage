@@ -227,6 +227,55 @@
             cursor: pointer;
         }
 
+        .item {
+            position: relative;
+        }
+
+        .delete-btn {
+            position: absolute;
+            top: 4px;
+            right: 4px;
+            width: 22px;
+            height: 22px;
+            border-radius: 50%;
+            border: none;
+            background: var(--bg);
+            box-shadow: 2px 2px 5px var(--shadow-d), -2px -2px 5px var(--shadow-l);
+            cursor: pointer;
+            font-size: 11px;
+            font-weight: 800;
+            color: #c0667a;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            z-index: 2;
+            transition: all 0.15s;
+        }
+
+        .delete-btn:active {
+            box-shadow: inset 2px 2px 4px var(--shadow-d), inset -2px -2px 4px var(--shadow-l);
+            transform: scale(0.92);
+        }
+
+        .lightbox-delete {
+            border: none;
+            border-radius: 50px;
+            padding: 9px 16px;
+            background: var(--bg);
+            box-shadow: 3px 3px 6px var(--shadow-d), -3px -3px 6px var(--shadow-l);
+            font-family: 'Nunito', sans-serif;
+            font-size: 12px;
+            font-weight: 700;
+            color: #c0667a;
+            cursor: pointer;
+            transition: all 0.15s;
+        }
+
+        .lightbox-delete:active {
+            box-shadow: inset 3px 3px 6px var(--shadow-d), inset -3px -3px 6px var(--shadow-l);
+            transform: scale(0.96);
+        }
+
         /* ── Lightbox ── */
         #lightbox {
             position: fixed;
@@ -421,7 +470,10 @@
         <div class="box">
             <div class="caption">
                 <span id="lightboxName"></span>
-                <button class="close-btn" id="closeLightbox">✕</button>
+                <div style="display: flex; gap: 8px; align-items: center;">
+                    <button class="lightbox-delete" id="lightboxDelete">Видалити</button>
+                    <button class="close-btn" id="closeLightbox">✕</button>
+                </div>
             </div>
             <img id="lightboxImg" src="" alt="">
         </div>
@@ -440,19 +492,48 @@
         const lightboxImg = document.getElementById('lightboxImg');
         const lightboxName = document.getElementById('lightboxName');
         const closeLightbox = document.getElementById('closeLightbox');
+        const lightboxDelete = document.getElementById('lightboxDelete');
+        let currentLightboxKey = null;
 
         function openLightbox(url, name) {
             lightboxImg.src = url;
             lightboxName.textContent = name;
+            currentLightboxKey = name;
             lightbox.classList.add('open');
         }
 
         function closeLightboxFn() {
             lightbox.classList.remove('open');
             lightboxImg.src = '';
+            currentLightboxKey = null;
+        }
+
+        async function deleteImage(key) {
+            if (!confirm(`Видалити фото "${key}"? Це незворотньо.`)) return;
+
+            const res = await fetch(`/delete?key=${encodeURIComponent(key)}`, { method: 'DELETE' });
+            const text = await res.text();
+
+            if (res.ok) {
+                statusEl.textContent = '🗑️ ' + text;
+                if (lightbox.classList.contains('open')) closeLightboxFn();
+
+                // Якщо видалили останнє фото на сторінці (не першій) - йдемо на попередню
+                const check = await fetch(`/list?page=${currentPage}`);
+                const checkData = await check.json();
+                const targetPage = (checkData.items.length === 0 && currentPage > 1)
+                    ? currentPage - 1
+                    : currentPage;
+                loadPage(targetPage);
+            } else {
+                statusEl.textContent = '❌ ' + text;
+            }
         }
 
         closeLightbox.addEventListener('click', closeLightboxFn);
+        lightboxDelete.addEventListener('click', () => {
+            if (currentLightboxKey) deleteImage(currentLightboxKey);
+        });
         lightbox.addEventListener('click', (e) => {
             if (e.target === lightbox) closeLightboxFn();
         });
@@ -469,11 +550,11 @@
             const text = await res.text();
 
             if (res.ok) {
-                statusEl.textContent = '' + text;
+                statusEl.textContent = '✅ ' + text;
                 form.reset();
                 loadPage(1);
             } else {
-                statusEl.textContent = '' + text;
+                statusEl.textContent = '❌ ' + text;
             }
         });
 
@@ -485,17 +566,22 @@
             gallery.innerHTML = '';
 
             if (data.items.length === 0) {
-                gallery.innerHTML = '<div class="empty">Тут поки порожньо</div>';
+                gallery.innerHTML = '<div class="empty">Тут поки порожньо 📭</div>';
             } else {
                 data.items.forEach(item => {
                     const div = document.createElement('div');
                     div.className = 'item';
                     div.innerHTML = `
+                        <button class="delete-btn" title="Видалити">✕</button>
                         <img src="${item.url}" alt="${item.key}">
                         <div class="name">${item.key}</div>
                         <div class="size">${(item.sizeBytes / 1024).toFixed(1)} KB</div>
                     `;
                     div.querySelector('img').addEventListener('click', () => openLightbox(item.url, item.key));
+                    div.querySelector('.delete-btn').addEventListener('click', (e) => {
+                        e.stopPropagation();
+                        deleteImage(item.key);
+                    });
                     gallery.appendChild(div);
                 });
             }

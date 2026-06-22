@@ -20,8 +20,8 @@ import (
 )
 
 const (
-	maxBucketBytes = 9 * 1024 * 1024 * 1024 // 9 GB limit
-	pageSize       = 10
+	maxBucketBytes = 9 * 1024 * 1024 * 1024 // 9 GB лімит
+	pageSize       = 10                     // картинок на сторінку
 )
 
 var (
@@ -66,12 +66,13 @@ func main() {
 	http.HandleFunc("/", serveHTML)
 	http.HandleFunc("/upload", handleUpload)
 	http.HandleFunc("/list", handleList)
+	http.HandleFunc("/delete", handleDelete)
 
 	port := os.Getenv("PORT")
 	if port == "" {
 		port = "8080"
 	}
- 
+
 	addr := "0.0.0.0:" + port
 	fmt.Printf("Сервер запущено на http://%s\n", addr)
 	log.Fatal(http.ListenAndServe(addr, nil))
@@ -124,23 +125,13 @@ func handleUpload(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Обмеження розміру одного файлу (10MB)
-	r.Body = http.MaxBytesReader(w, r.Body, 10<<20)
-
-	err := r.ParseMultipartForm(10 << 20)
-	if err != nil {
-		http.Error(w, fmt.Sprintf("Помилка парсингу форми: %v", err), http.StatusBadRequest)
-		return
-	}
-
 	file, header, err := r.FormFile("photo")
 	if err != nil {
 		http.Error(w, fmt.Sprintf("Помилка отримання файлу: %v", err), http.StatusBadRequest)
 		return
 	}
 	defer file.Close()
-
-	// bucket check
+	//check limit
 	currentSize, err := getBucketTotalSize(r.Context())
 	if err != nil {
 		log.Printf("Помилка підрахунку розміру бакета: %v", err)
@@ -271,4 +262,31 @@ func handleList(w http.ResponseWriter, r *http.Request) {
 
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(resp)
+}
+
+func handleDelete(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodDelete {
+		http.Error(w, "Тільки DELETE", http.StatusMethodNotAllowed)
+		return
+	}
+
+	key := r.URL.Query().Get("key")
+	if key == "" {
+		http.Error(w, "Не вказано параметр key", http.StatusBadRequest)
+		return
+	}
+
+	_, err := s3Client.DeleteObject(r.Context(), &s3.DeleteObjectInput{
+		Bucket: aws.String(bucketName),
+		Key:    aws.String(key),
+	})
+	if err != nil {
+		log.Printf("Помилка видалення %s: %v", key, err)
+		http.Error(w, fmt.Sprintf("Помилка видалення: %v", err), http.StatusInternalServerError)
+		return
+	}
+
+	fmt.Printf("🗑️ Видалено файл: %s\n", key)
+	w.WriteHeader(http.StatusOK)
+	fmt.Fprintf(w, "Файл %s видалено", key)
 }
