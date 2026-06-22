@@ -21,7 +21,7 @@ import (
 
 const (
 	maxBucketBytes = 9 * 1024 * 1024 * 1024 // 9 GB лімит
-	pageSize       = 10                     // картинок на сторінку
+	pageSize       = 10
 )
 
 var (
@@ -125,13 +125,18 @@ func handleUpload(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	file, header, err := r.FormFile("photo")
-	if err != nil {
-		http.Error(w, fmt.Sprintf("Помилка отримання файлу: %v", err), http.StatusBadRequest)
+	headers := r.MultipartForm.File["photo"]
+	if len(headers) == 0 {
+		http.Error(w, "Не передано жодного файлу", http.StatusBadRequest)
 		return
 	}
-	defer file.Close()
-	//check limit
+
+	//check backet limit
+	var totalNewBytes int64
+	for _, h := range headers {
+		totalNewBytes += h.Size
+	}
+
 	currentSize, err := getBucketTotalSize(r.Context())
 	if err != nil {
 		log.Printf("Помилка підрахунку розміру бакета: %v", err)
@@ -139,34 +144,57 @@ func handleUpload(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if currentSize+header.Size > maxBucketBytes {
+	if currentSize+totalNewBytes > maxBucketBytes {
 		msg := fmt.Sprintf(
-			"Відмова: бакет заповнений (%.2f GB з %.2f GB лімітом), новий файл (%.2f MB) не влізе",
+			"Відмова: бакет заповнений (%.2f GB з %.2f GB лімітом), %d файл(и) (%.2f MB разом) не влізуть",
 			float64(currentSize)/(1024*1024*1024),
 			float64(maxBucketBytes)/(1024*1024*1024),
-			float64(header.Size)/(1024*1024),
+			len(headers),
+			float64(totalNewBytes)/(1024*1024),
 		)
 		log.Println("" + msg)
 		http.Error(w, msg, http.StatusInsufficientStorage) // 507
 		return
 	}
 
-	fmt.Printf("Отримано файл: %s, розмір: %d байт (бакет зараз: %.2f GB)\n",
-		header.Filename, header.Size, float64(currentSize)/(1024*1024*1024))
+	// --- Завантажуємо кожен файл по черзі ---
+	var uploaded []string
+	var failed []string
 
-	_, err = s3Client.PutObject(context.TODO(), &s3.PutObjectInput{
-		Bucket:      aws.String(bucketName),
-		Key:         aws.String(header.Filename),
-		Body:        file,
-		ContentType: aws.String(header.Header.Get("Content-Type")),
-	})
-	if err != nil {
-		log.Printf("Помилка завантаження в R2: %v", err)
-		http.Error(w, fmt.Sprintf("Помилка завантаження в R2: %v", err), http.StatusInternalServerError)
+	for _, header := range headers {
+		file, err := header.Open()
+		if err != nil {
+			log.Printf("Помилка відкриття файлу %s: %v", header.Filename, err)
+			failed = append(failed, header.Filename)
+			continue
+		}
+
+		fmt.Printf("Отримано файл: %s, розмір: %d байт\n", header.Filename, header.Size)
+
+		_, err = s3Client.PutObject(context.TODO(), &s3.PutObjectInput{
+			Bucket:      aws.String(bucketName),
+			Key:         aws.String(header.Filename),
+			Body:        file,
+			ContentType: aws.String(header.Header.Get("Content-Type")),
+		})
+		file.Close()
+
+		if err != nil {
+			log.Printf("Помилка завантаження %s в R2: %v", header.Filename, err)
+			failed = append(failed, header.Filename)
+			continue
+		}
+
+		uploaded = append(uploaded, header.Filename)
+	}
+
+	if len(failed) > 0 {
+		w.WriteHeader(http.StatusMultiStatus) // 207 some photos are loaded
+		fmt.Fprintf(w, "Завантажено: %d (%v). Помилка з: %v", len(uploaded), uploaded, failed)
 		return
 	}
 
-	fmt.Fprintf(w, "Файл %s успішно завантажено в бакет %s", header.Filename, bucketName)
+	fmt.Fprintf(w, "Успішно завантажено %d файл(и): %v", len(uploaded), uploaded)
 }
 
 // --- Структури для JSON відповіді /list ---
@@ -286,7 +314,7 @@ func handleDelete(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	fmt.Printf("🗑️ Видалено файл: %s\n", key)
+	fmt.Printf("Видалено файл: %s\n", key)
 	w.WriteHeader(http.StatusOK)
 	fmt.Fprintf(w, "Файл %s видалено", key)
 }
