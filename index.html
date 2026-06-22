@@ -1,0 +1,419 @@
+<!DOCTYPE html>
+<html lang="uk">
+<head>
+    <meta charset="UTF-8">
+    <title>R2 Photo Storage</title>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Nunito:wght@400;600;700;800&display=swap');
+
+        :root {
+            --bg: #e0e5ec;
+            --shadow-d: #b8bec7;
+            --shadow-l: #ffffff;
+            --text: #4b5563;
+            --text-muted: #9ca3af;
+            --accent: #868e99;
+        }
+
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+
+        body {
+            background: var(--bg);
+            font-family: 'Nunito', sans-serif;
+            min-height: 100vh;
+            display: flex;
+            justify-content: center;
+            padding: 40px 20px;
+        }
+
+        ::-webkit-scrollbar { width: 0; }
+
+        .card {
+            width: 100%;
+            max-width: 760px;
+            background: var(--bg);
+            border-radius: 28px;
+            box-shadow: 9px 9px 18px var(--shadow-d), -9px -9px 18px var(--shadow-l);
+            padding: 32px;
+        }
+
+        h1 {
+            font-size: 19px;
+            font-weight: 800;
+            color: var(--text);
+            margin-bottom: 18px;
+        }
+
+        h2 {
+            font-size: 16px;
+            font-weight: 800;
+            color: var(--text);
+            margin: 28px 0 14px;
+        }
+
+        /* ── Upload form ── */
+        #uploadForm {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+
+        .file-wrap {
+            flex: 1;
+            display: flex;
+            align-items: center;
+            background: var(--bg);
+            border-radius: 50px;
+            box-shadow: inset 4px 4px 8px var(--shadow-d), inset -4px -4px 8px var(--shadow-l);
+            padding: 0 18px;
+        }
+
+        input[type="file"] {
+            flex: 1;
+            border: none;
+            outline: none;
+            background: transparent;
+            font-family: 'Nunito', sans-serif;
+            font-size: 13px;
+            font-weight: 600;
+            color: var(--text);
+            padding: 13px 0;
+        }
+
+        input[type="file"]::file-selector-button {
+            border: none;
+            border-radius: 50px;
+            padding: 7px 14px;
+            margin-right: 12px;
+            background: var(--bg);
+            box-shadow: 3px 3px 6px var(--shadow-d), -3px -3px 6px var(--shadow-l);
+            font-family: 'Nunito', sans-serif;
+            font-size: 12px;
+            font-weight: 700;
+            color: var(--text);
+            cursor: pointer;
+        }
+
+        button[type="submit"] {
+            width: 46px;
+            height: 46px;
+            border-radius: 50%;
+            border: none;
+            background: var(--accent);
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            flex-shrink: 0;
+            box-shadow: 4px 4px 8px var(--shadow-d), -4px -4px 8px var(--shadow-l);
+            transition: all 0.15s;
+        }
+
+        button[type="submit"]:active {
+            box-shadow: inset 3px 3px 6px #6e7580, inset -3px -3px 6px #9ea8b3;
+            transform: scale(0.95);
+        }
+
+        button[type="submit"]::after {
+            content: "↑";
+            color: #fff;
+            font-size: 18px;
+            font-weight: 800;
+        }
+
+        #status {
+            margin-top: 14px;
+            font-size: 12px;
+            font-weight: 700;
+            color: var(--text-muted);
+        }
+
+        /* ── Gallery ── */
+        #gallery {
+            display: grid;
+            grid-template-columns: repeat(5, 1fr);
+            gap: 14px;
+        }
+
+        .item {
+            background: var(--bg);
+            border-radius: 18px;
+            box-shadow: 4px 4px 10px var(--shadow-d), -4px -4px 10px var(--shadow-l);
+            padding: 8px;
+            text-align: center;
+            transition: transform 0.15s;
+        }
+
+        .item:hover {
+            transform: translateY(-2px);
+        }
+
+        .item img {
+            width: 100%;
+            height: 100px;
+            object-fit: cover;
+            border-radius: 12px;
+            box-shadow: inset 2px 2px 5px var(--shadow-d), inset -2px -2px 5px var(--shadow-l);
+            display: block;
+            margin-bottom: 6px;
+        }
+
+        .item .name {
+            font-size: 10px;
+            font-weight: 700;
+            color: var(--text);
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+
+        .item .size {
+            font-size: 10px;
+            font-weight: 600;
+            color: var(--text-muted);
+        }
+
+        /* ── Pagination ── */
+        #pagination {
+            margin-top: 22px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 16px;
+        }
+
+        .page-btn {
+            border: none;
+            background: var(--bg);
+            border-radius: 50px;
+            padding: 9px 18px;
+            font-family: 'Nunito', sans-serif;
+            font-size: 12px;
+            font-weight: 700;
+            color: var(--text);
+            box-shadow: 4px 4px 8px var(--shadow-d), -4px -4px 8px var(--shadow-l);
+            cursor: pointer;
+            transition: all 0.15s;
+        }
+
+        .page-btn:active:not(:disabled) {
+            box-shadow: inset 3px 3px 6px var(--shadow-d), inset -3px -3px 6px var(--shadow-l);
+            transform: scale(0.96);
+        }
+
+        .page-btn:disabled {
+            color: var(--text-muted);
+            cursor: not-allowed;
+            opacity: 0.6;
+        }
+
+        #pageInfo {
+            font-size: 12px;
+            font-weight: 700;
+            color: var(--text-muted);
+        }
+
+        .empty {
+            grid-column: 1 / -1;
+            text-align: center;
+            font-size: 13px;
+            font-weight: 600;
+            color: var(--text-muted);
+            padding: 30px 0;
+        }
+
+        .item img {
+            cursor: pointer;
+        }
+
+        /* ── Lightbox ── */
+        #lightbox {
+            position: fixed;
+            inset: 0;
+            background: rgba(75, 85, 99, 0.55);
+            display: none;
+            align-items: center;
+            justify-content: center;
+            z-index: 100;
+            padding: 30px;
+            animation: fadeIn 0.2s ease;
+        }
+
+        #lightbox.open {
+            display: flex;
+        }
+
+        #lightbox .box {
+            background: var(--bg);
+            border-radius: 24px;
+            box-shadow: 9px 9px 18px var(--shadow-d), -9px -9px 18px var(--shadow-l);
+            padding: 16px;
+            max-width: 90vw;
+            max-height: 90vh;
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+        }
+
+        #lightbox img {
+            max-width: 100%;
+            max-height: 75vh;
+            object-fit: contain;
+            border-radius: 14px;
+            display: block;
+        }
+
+        #lightbox .caption {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 14px;
+        }
+
+        #lightbox .caption span {
+            font-size: 12px;
+            font-weight: 700;
+            color: var(--text);
+        }
+
+        .close-btn {
+            width: 34px;
+            height: 34px;
+            border-radius: 50%;
+            border: none;
+            background: var(--bg);
+            box-shadow: 3px 3px 6px var(--shadow-d), -3px -3px 6px var(--shadow-l);
+            cursor: pointer;
+            font-size: 14px;
+            font-weight: 800;
+            color: var(--text);
+            flex-shrink: 0;
+            transition: all 0.15s;
+        }
+
+        .close-btn:active {
+            box-shadow: inset 2px 2px 5px var(--shadow-d), inset -2px -2px 5px var(--shadow-l);
+            transform: scale(0.94);
+        }
+
+        @keyframes fadeIn {
+            from { opacity: 0; }
+            to { opacity: 1; }
+        }
+    </style>
+</head>
+<body>
+    <div class="card">
+        <h1>Завантажити фото в R2</h1>
+        <form id="uploadForm" enctype="multipart/form-data">
+            <div class="file-wrap">
+                <input type="file" name="photo" accept="image/*" required>
+            </div>
+            <button type="submit"></button>
+        </form>
+        <div id="status"></div>
+
+        <h2>Галерея</h2>
+        <div id="gallery"></div>
+        <div id="pagination">
+            <button class="page-btn" id="prevBtn">← Назад</button>
+            <span id="pageInfo"></span>
+            <button class="page-btn" id="nextBtn">Далі →</button>
+        </div>
+    </div>
+
+    <div id="lightbox">
+        <div class="box">
+            <div class="caption">
+                <span id="lightboxName"></span>
+                <button class="close-btn" id="closeLightbox">✕</button>
+            </div>
+            <img id="lightboxImg" src="" alt="">
+        </div>
+    </div>
+
+    <script>
+        let currentPage = 1;
+
+        const form = document.getElementById('uploadForm');
+        const statusEl = document.getElementById('status');
+        const gallery = document.getElementById('gallery');
+        const pageInfo = document.getElementById('pageInfo');
+        const prevBtn = document.getElementById('prevBtn');
+        const nextBtn = document.getElementById('nextBtn');
+        const lightbox = document.getElementById('lightbox');
+        const lightboxImg = document.getElementById('lightboxImg');
+        const lightboxName = document.getElementById('lightboxName');
+        const closeLightbox = document.getElementById('closeLightbox');
+
+        function openLightbox(url, name) {
+            lightboxImg.src = url;
+            lightboxName.textContent = name;
+            lightbox.classList.add('open');
+        }
+
+        function closeLightboxFn() {
+            lightbox.classList.remove('open');
+            lightboxImg.src = '';
+        }
+
+        closeLightbox.addEventListener('click', closeLightboxFn);
+        lightbox.addEventListener('click', (e) => {
+            if (e.target === lightbox) closeLightboxFn();
+        });
+        document.addEventListener('keydown', (e) => {
+            if (e.key === 'Escape') closeLightboxFn();
+        });
+
+        form.addEventListener('submit', async (e) => {
+            e.preventDefault();
+            statusEl.textContent = 'Завантаження...';
+
+            const formData = new FormData(form);
+            const res = await fetch('/upload', { method: 'POST', body: formData });
+            const text = await res.text();
+
+            if (res.ok) {
+                statusEl.textContent = '✅ ' + text;
+                form.reset();
+                loadPage(1);
+            } else {
+                statusEl.textContent = '❌ ' + text;
+            }
+        });
+
+        async function loadPage(page) {
+            const res = await fetch(`/list?page=${page}`);
+            const data = await res.json();
+
+            currentPage = data.page;
+            gallery.innerHTML = '';
+
+            if (data.items.length === 0) {
+                gallery.innerHTML = '<div class="empty">Тут поки порожньо 📭</div>';
+            } else {
+                data.items.forEach(item => {
+                    const div = document.createElement('div');
+                    div.className = 'item';
+                    div.innerHTML = `
+                        <img src="${item.url}" alt="${item.key}">
+                        <div class="name">${item.key}</div>
+                        <div class="size">${(item.sizeBytes / 1024).toFixed(1)} KB</div>
+                    `;
+                    div.querySelector('img').addEventListener('click', () => openLightbox(item.url, item.key));
+                    gallery.appendChild(div);
+                });
+            }
+
+            pageInfo.textContent = `${data.page} / ${data.totalPages}`;
+            prevBtn.disabled = data.page <= 1;
+            nextBtn.disabled = data.page >= data.totalPages;
+        }
+
+        prevBtn.addEventListener('click', () => loadPage(currentPage - 1));
+        nextBtn.addEventListener('click', () => loadPage(currentPage + 1));
+
+        loadPage(1);
+    </script>
+</body>
+</html>
